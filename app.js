@@ -20,6 +20,40 @@ let startTime = 0;
 let timerHandle = null;
 let moves = 0;
 
+const touchMode = (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) || window.matchMedia?.("(pointer: coarse)").matches;
+
+let ghostEl = null;
+let overEl = null;
+let pointerActive = false;
+
+function clearOver(){
+  if (overEl){ overEl.classList.remove("over"); overEl = null; }
+}
+function removeGhost(){
+  if (ghostEl){ ghostEl.remove(); ghostEl = null; }
+}
+function setOver(el){
+  if (overEl === el) return;
+  clearOver();
+  overEl = el;
+  if (overEl) overEl.classList.add("over");
+}
+function createGhost(fromEl, x, y){
+  removeGhost();
+  const g = fromEl.cloneNode(true);
+  g.classList.add("ghost");
+  g.classList.remove("over");
+  g.classList.remove("dragging");
+  document.body.appendChild(g);
+  ghostEl = g;
+  moveGhost(x, y);
+}
+function moveGhost(x, y){
+  if (!ghostEl) return;
+  ghostEl.style.left = x + "px";
+  ghostEl.style.top = y + "px";
+}
+
 function pad2(n){ return String(n).padStart(2,"0"); }
 function fmtTime(ms){
   const t = Math.max(0, ms);
@@ -96,11 +130,13 @@ function render(){
     const n = order[i];
     const div = document.createElement("div");
     div.className = "book";
-    div.draggable = true;
+    div.draggable = !touchMode;
     div.dataset.idx = String(i);
     div.textContent = String(n);
 
-    div.addEventListener("dragstart", (e) => {
+    
+    if (!touchMode) {
+div.addEventListener("dragstart", (e) => {
       draggingIdx = Number(div.dataset.idx);
       div.classList.add("dragging");
       e.dataTransfer?.setData("text/plain", String(n));
@@ -134,6 +170,66 @@ function render(){
       updateStats();
       checkClear();
     });
+    } else {
+      // Pointer/touch drag (swap)
+      div.addEventListener("pointerdown", (e) => {
+        if (pointerActive) return;
+        pointerActive = true;
+        draggingIdx = Number(div.dataset.idx);
+        div.classList.add("dragging");
+        if (!running) startTimer();
+
+        // Capture pointer so we keep receiving events
+        try { div.setPointerCapture(e.pointerId); } catch {}
+
+        createGhost(div, e.clientX, e.clientY);
+
+        const onMove = (ev) => {
+          moveGhost(ev.clientX, ev.clientY);
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const book = el?.closest?.(".book");
+          if (book && shelf.contains(book)) {
+            setOver(book);
+          } else {
+            clearOver();
+          }
+        };
+
+        const onUp = (ev) => {
+          // finalize
+          try { div.releasePointerCapture(e.pointerId); } catch {}
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", onUp);
+          document.removeEventListener("pointercancel", onUp);
+
+          div.classList.remove("dragging");
+          removeGhost();
+
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const book = el?.closest?.(".book");
+          const targetIdx = book && shelf.contains(book) ? Number(book.dataset.idx) : null;
+          clearOver();
+
+          if (draggingIdx != null && targetIdx != null && targetIdx !== draggingIdx) {
+            // swap
+            [order[draggingIdx], order[targetIdx]] = [order[targetIdx], order[draggingIdx]];
+            moves++;
+            movesEl.textContent = String(moves);
+            render();
+            updateStats();
+            checkClear();
+          }
+
+          draggingIdx = null;
+          pointerActive = false;
+        };
+
+        document.addEventListener("pointermove", onMove, { passive: false });
+        document.addEventListener("pointerup", onUp);
+        document.addEventListener("pointercancel", onUp);
+        e.preventDefault();
+      });
+    }
 
     shelf.appendChild(div);
   }

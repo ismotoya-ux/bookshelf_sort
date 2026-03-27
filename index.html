@@ -18,6 +18,7 @@
       border:1px solid #ddd; border-radius:14px; padding:12px; background:#fff;
       display:grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap:8px;
       user-select:none;
+      touch-action: none;
     }
     .book{
       border:1px solid #999; border-radius:10px; background:#fff;
@@ -28,6 +29,14 @@
     .book:active{cursor:grabbing;}
     .book.dragging{opacity:.4;}
     .book.over{outline:3px solid rgba(0,120,255,.35);}
+    .ghost{
+      position: fixed;
+      z-index: 9999;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      opacity: .85;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
     .panel{border:1px solid #ddd; border-radius:14px; padding:12px; background:#fff;}
     .big{font-size:22px; font-weight:800;}
     .ok{color:#0a7; font-weight:800;}
@@ -81,7 +90,7 @@
       <div class="hint">
         コツ：<br>
         ・本をドラッグして、置きたい本の上でドロップすると<b>入れ替え</b>になります。<br>
-        ・タイマーは「スタート」か、最初の操作で動きます。
+        ・タイマーは「スタート」か、最初の操作で動きます。<br>・スマホ/iPadは指でドラッグして入れ替えできます。
       </div>
     </div>
   </div>
